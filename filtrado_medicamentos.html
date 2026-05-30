@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Herramienta de Filtrado de Medicamentos</title>
+    <style>
+        :root {
+            --primary: #0056b3;
+            --secondary: #17a2b8;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --bg: #f4f7f6;
+            --card-bg: #ffffff;
+            --border: #ccc;
+            --text: #333;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        h1, h2, h3 { color: var(--primary); }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .full-width { grid-column: 1 / -1; }
+        label { font-weight: bold; display: block; margin-top: 10px; }
+        input[type="number"] {
+            width: 80px; padding: 5px; margin-top: 5px; border-radius: 4px; border: 1px solid var(--border);
+        }
+        textarea {
+            width: 100%; height: 200px; padding: 10px; margin-top: 10px;
+            border-radius: 4px; border: 1px solid var(--border); font-family: monospace;
+            box-sizing: border-box;
+            white-space: pre; overflow-wrap: normal; overflow-x: auto;
+        }
+        button {
+            background-color: var(--primary); color: white; border: none; padding: 10px 20px;
+            font-size: 16px; border-radius: 4px; cursor: pointer; margin-top: 15px; width: 100%;
+        }
+        button:hover { background-color: #004494; }
+        .btn-info { background-color: var(--secondary); width: auto; margin-top: 10px;}
+        .btn-info:hover { background-color: #138496; }
+        
+        .alert {
+            padding: 15px; margin-top: 20px; border-radius: 4px; display: none; font-weight: bold; font-size: 1.1em;
+        }
+        .alert.error { background-color: #f8d7da; color: #721c24; display: block; }
+        .alert.success { background-color: #d4edda; color: #155724; display: block; border: 1px solid #c3e6cb;}
+        
+        /* Dashboard de Métricas */
+        .metrics-container {
+            display: none; 
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-card.bg-blue { background-color: var(--primary); }
+        .metric-card.bg-green { background-color: var(--success); }
+        .metric-card.bg-red { background-color: var(--danger); }
+        .metric-card.bg-orange { background-color: #fd7e14; }
+        
+        .metric-title {
+            font-size: 0.85em;
+            font-weight: bold;
+            text-transform: uppercase;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 2.2em;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%; border-collapse: collapse; margin-top: 15px;
+        }
+        th, td {
+            border: 1px solid var(--border); padding: 10px; text-align: left;
+        }
+        
+        /* Estilos Tabla de Rechazados (La única visible) */
+        .table-red th { background-color: var(--danger); color: white; border-color: #c82333; }
+        .table-red td { border-color: #f5c6cb; }
+        .table-red tr:nth-child(even) { background-color: #f8d7da; }
+        .table-red tr:nth-child(odd) { background-color: #fff; }
+
+        /* Estilos para Checkbox grande */
+        .large-checkbox {
+            transform: scale(1.8);
+            cursor: pointer;
+            margin: 0;
+        }
+
+        /* Ocultar columnas extra */
+        .hidden-col {
+            display: none !important;
+        }
+
+        .help-text { font-size: 0.85em; color: #666; margin-bottom: 10px; line-height: 1.4;}
+        
+        /* Estilos del Modal */
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; 
+            overflow: auto; background-color: rgba(0,0,0,0.5); 
+        }
+        .modal-content {
+            background-color: #fff; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%; 
+            max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 80vh; display: flex; flex-direction: column;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); 
+            padding-bottom: 10px; margin-bottom: 10px;
+        }
+        .modal-header h2 { margin: 0; }
+        .close-btn { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-btn:hover, .close-btn:focus { color: black; }
+        .modal-body { overflow-y: auto; padding-right: 10px; }
+        .modal-body ol { padding-left: 20px; margin: 0; }
+        .modal-body li { padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+        .modal-body li:last-child { border-bottom: none; }
+
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="full-width">
+            <h1>Filtrado de Preparación de Medicamentos</h1>
+            <p>Pegue los datos desde Excel. El sistema aplicará los límites de capacidad basándose en la jerarquía. <br>
+            <strong>Regla Especial:</strong> Si un medicamento <strong>NO</strong> está en la lista de jerarquía, el sistema lo asume automáticamente como <strong>PREPARACIÓN OBLIGATORIA</strong> y garantizará su espacio.</p>
+            <button class="btn-info" onclick="abrirModal()">Ver Jerarquía de Medicamentos</button>
+        </div>
+
+        <div class="card">
+            <h2>Configuración de Límites</h2>
+            
+            <label>Capacidad Total Diaria:</label>
+            <input type="number" id="capTotal" value="65" oninput="validarLimites()">
+
+            <label>Franja 1 (00:00 - 04:00):</label>
+            <input type="number" id="limF1" value="20" oninput="validarLimites()">
+
+            <label>Franja 2 (05:00 - 07:00):</label>
+            <input type="number" id="limF2" value="20" oninput="validarLimites()">
+
+            <label>Franja 3 (08:00 - 10:00):</label>
+            <input type="number" id="limF3" value="25" oninput="validarLimites()">
+
+            <div id="alertaLimites" class="alert success" style="padding:10px; font-size:1em;">Límites correctos. Las franjas suman 65.</div>
+
+            <h2>Datos de Entrada</h2>
+            <div class="help-text">Pegue su listado aquí abajo (acepta columnas de Excel o texto con espacios):</div>
+            <textarea id="datosEntrada" placeholder="CO5 00:00 Merrem 1g = 100mL ss&#10;GU12 00:00 Nexium 40mg = 10mL ss"></textarea>
+            
+            <button onclick="procesarMedicamentos()">Filtrar y Procesar</button>
+        </div>
+
+        <div class="card">
+            <h2>Resultados del Proceso</h2>
+
+            <div id="panelMetricas" class="metrics-container">
+                <div class="metric-card bg-blue">
+                    <div class="metric-title">Solicitudes</div>
+                    <div class="metric-value" id="metTotal">0</div>
+                </div>
+                <div class="metric-card bg-green">
+                    <div class="metric-title">A Preparar</div>
+                    <div class="metric-value" id="metAceptar">0</div>
+                </div>
+                <div class="metric-card bg-red">
+                    <div class="metric-title">Sin Preparar</div>
+                    <div class="metric-value" id="metRechazar">0</div>
+                </div>
+                <div class="metric-card bg-orange">
+                    <div class="metric-title">Fuera Horario</div>
+                    <div class="metric-value" id="metFueraHorario">0</div>
+                </div>
+            </div>
+
+            <div id="seccionRechazados" style="display: none; margin-top: 30px;">
+                <h3 style="color: var(--danger); margin-bottom: 5px;">⚠️ Listado de Medicamentos NO Preparados</h3>
+                <div class="help-text" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <span>Estos medicamentos son conocidos pero tuvieron que ser descartados por exceder la capacidad, o están fuera del horario. Utiliza la casilla para marcar los que ya registraste.</span>
+                    <button id="btnToggleColumnas" onclick="toggleDetallesExtra()" class="btn-info" style="width: auto; margin-top: 0; padding: 6px 12px; font-size: 0.9em;">👁️ Mostrar Detalles (Motivo / Importancia)</button>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table id="tablaRechazados" class="table-red">
+                        <thead>
+                            <tr>
+                                <th style="width: 30px; text-align: center;">#</th>
+                                <th>Pabellón y Cama</th>
+                                <th>Medicamento</th>
+                                <th>Horario</th>
+                                <th style="text-align: center; width: 90px;">Registrado</th>
+                                <th class="col-extra hidden-col">Motivo / Franja</th>
+                                <th class="col-extra hidden-col">Nivel de Importancia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpoTablaRechazados">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="mensajeExitoTotal" class="alert success" style="display: none; text-align: center;">
+                🎉 ¡Excelente! La capacidad es suficiente.<br><strong>Todos los medicamentos de la lista (dentro del horario) se van a preparar.</strong>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="modalJerarquia" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Jerarquía de Prioridad</h2>
+                <span class="close-btn" onclick="cerrarModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="help-text">El Nivel 1 es el más importante (último en descartarse). <br><strong>Importante:</strong> Cualquier medicamento que NO esté en esta lista, se auto-aprueba y no compite por cupo.</p>
+                <ol id="listaModal">
+                    </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const listaMedicamentos = [
+            "Omeprazol Infusión", "Glypressin", "Miccil", "Avapena", "Voltaren", "Dorixina",
+            "Clonixinato de lisina", "Haloperidol", "Vessel Due", "Solidtrax", "Somazina",
+            "Tronium", "Nexium", "Pantozol", "Prazolna", "Dicynone", "Hioscina", "Alin",
+            "Lasix", "Stadium", "Keral", "Velian", "Carnotprim", "Dynastat", "Inhibitron",
+            "Pentren", "Supradol", "Dolac", "Onemer", "Krunamina", "Relacum", "Bufigen",
+            "Diomati", "K-50", "Graten", "Fenaten", "Supradol Duet", "Keppra", "Libertrim",
+            "Solu-Medrol", "Metilprednisolona", "Alnex", "Tradol", "Pisazol"
+        ];
+
+        let columnasVisibles = false;
+
+        // ---- Funciones de Interfaz ----
+        function abrirModal() {
+            const modal = document.getElementById('modalJerarquia');
+            const listaUI = document.getElementById('listaModal');
+            if(listaUI.children.length === 0) {
+                listaMedicamentos.forEach((med, index) => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>Nivel ${index + 1}:</strong> ${med}`;
+                    listaUI.appendChild(li);
+                });
+            }
+            modal.style.display = 'block';
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalJerarquia').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('modalJerarquia');
+            if (event.target === modal) {
+                cerrarModal();
+            }
+        }
+
+        function toggleDetallesExtra() {
+            columnasVisibles = !columnasVisibles;
+            const elementosExtra = document.querySelectorAll('.col-extra');
+            const btnToggle = document.getElementById('btnToggleColumnas');
+
+            elementosExtra.forEach(el => {
+                if(columnasVisibles) {
+                    el.classList.remove('hidden-col');
+                } else {
+                    el.classList.add('hidden-col');
+                }
+            });
+
+            if(columnasVisibles) {
+                btnToggle.innerText = "👁️ Ocultar Detalles (Motivo / Importancia)";
+            } else {
+                btnToggle.innerText = "👁️ Mostrar Detalles (Motivo / Importancia)";
+            }
+        }
+
+        function validarLimites() {
+            const total = parseInt(document.getElementById('capTotal').value) || 0;
+            const f1 = parseInt(document.getElementById('limF1').value) || 0;
+            const f2 = parseInt(document.getElementById('limF2').value) || 0;
+            const f3 = parseInt(document.getElementById('limF3').value) || 0;
+            const suma = f1 + f2 + f3;
+            const alerta = document.getElementById('alertaLimites');
+            
+            if (suma === total) {
+                alerta.className = 'alert success';
+                alerta.innerText = `CORRECTO: Las franjas suman ${suma}, coincidiendo con el total diario.`;
+            } else {
+                alerta.className = 'alert error';
+                alerta.innerText = `¡ALERTA! Las franjas suman ${suma}, pero la capacidad total es ${total}.`;
+            }
+        }
+
+        // ---- Motor de Filtrado ----
+        function procesarMedicamentos() {
+            const limF1 = parseInt(document.getElementById('limF1').value) || 0;
+            const limF2 = parseInt(document.getElementById('limF2').value) || 0;
+            const limF3 = parseInt(document.getElementById('limF3').value) || 0;
+
+            const rawData = document.getElementById('datosEntrada').value.trim();
+            if (!rawData) {
+                alert("Por favor, pegue los datos en el cuadro de texto.");
+                return;
+            }
+
+            const filas = rawData.split('\n');
+            const procesados = [];
+            const rechazadosFueraFranja = [];
+
+            const timeRegex = /\b(\d{1,2}:\d{2})\b/;
+
+            filas.forEach((fila, i) => {
+                fila = fila.trim();
+                if (!fila) return;
+
+                const timeMatch = fila.match(timeRegex);
+                if (!timeMatch) return;
+
+                const horaOriginal = timeMatch[1];
+                let pabCama = "";
+                let med = "";
+
+                if (fila.includes('\t')) {
+                    const columnas = fila.split('\t');
+                    let idxHora = columnas.findIndex(c => c.includes(horaOriginal));
+                    
+                    if (idxHora === 1) { 
+                        pabCama = columnas[0];
+                        med = columnas.slice(2).join(" ");
+                    } else if (idxHora === 2) { 
+                        pabCama = columnas[0];
+                        med = columnas[1];
+                    } else { 
+                        pabCama = columnas[1] || "";
+                        med = columnas.slice(2).join(" ");
+                    }
+                } else {
+                    let filaSinHora = fila.replace(timeMatch[0], "|||");
+                    let partes = filaSinHora.split("|||");
+                    
+                    if (partes[0].trim() !== "" && partes[1] && partes[1].trim() !== "") {
+                        pabCama = partes[0].trim();
+                        med = partes[1].trim();
+                    } else {
+                        let textoRestante = fila.replace(timeMatch[0], "").trim();
+                        const matchPab = textoRestante.match(/^([a-zA-Z]+\s*\d+)/);
+                        if (matchPab) {
+                            pabCama = matchPab[1].trim();
+                            med = textoRestante.substring(matchPab[1].length).trim();
+                        } else {
+                            let palabras = textoRestante.split(/\s+/);
+                            pabCama = palabras.shift();
+                            med = palabras.join(" ");
+                        }
+                    }
+                }
+
+                pabCama = pabCama.replace(/\t/g, "").trim();
+                med = med.replace(/\t/g, "").trim();
+                if (!pabCama || !med) return;
+
+                const matchExtractPab = pabCama.match(/^([a-zA-Z]+)\s*(\d+)/);
+                const pabCodigo = matchExtractPab ? matchExtractPab[1].toUpperCase() : pabCama.toUpperCase();
+                const camaNum = matchExtractPab ? parseInt(matchExtractPab[2], 10) : 999;
+                const pabCamaLimpio = matchExtractPab ? `${pabCodigo} ${camaNum}` : pabCama;
+
+                let pMed = 99; 
+                let isUnlisted = true; 
+                
+                for (let m = 0; m < listaMedicamentos.length; m++) {
+                    if (med.toLowerCase().includes(listaMedicamentos[m].toLowerCase())) {
+                        pMed = m + 1;
+                        isUnlisted = false; 
+                        break;
+                    }
+                }
+
+                let horas = 0, mins = 0;
+                let horaLimpia = horaOriginal.replace(/[^\d:]/g, ''); 
+                const partesHora = horaLimpia.split(":");
+                if (partesHora.length >= 2) {
+                    horas = parseInt(partesHora[0]) || 0;
+                    mins = parseInt(partesHora[1]) || 0;
+                }
+
+                const totalMins = (horas * 60) + mins;
+                let franja = 0;
+                let nombreFranja = "";
+                const horaFormateada = `${horas.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+
+                if (totalMins >= 0 && totalMins <= 240) { 
+                    franja = 1; nombreFranja = "Franja 1 (00:00-04:00)";
+                } else if (totalMins >= 300 && totalMins <= 420) { 
+                    franja = 2; nombreFranja = "Franja 2 (05:00-07:00)";
+                } else if (totalMins >= 480 && totalMins <= 600) { 
+                    franja = 3; nombreFranja = "Franja 3 (08:00-10:00)";
+                } else {
+                    rechazadosFueraFranja.push({
+                        pabCama: pabCamaLimpio, med, horaFormateada, franja: 0, nombreFranja: "Fuera de Horario", pMed, camaNum, isUnlisted, ordenOriginal: i
+                    });
+                    return; 
+                }
+                
+                procesados.push({
+                    pabCama: pabCamaLimpio, med, horaFormateada, franja, nombreFranja, pMed, camaNum, isUnlisted, ordenOriginal: i
+                });
+            });
+
+            const funcOrden = (a, b) => {
+                if (a.pMed !== b.pMed) return a.pMed - b.pMed;             
+                if (a.camaNum !== b.camaNum) return a.camaNum - b.camaNum; 
+                return a.ordenOriginal - b.ordenOriginal;                  
+            };
+
+            const procesarCapacidad = (arrProcesados, limite, numFranja) => {
+                const enFranja = arrProcesados.filter(r => r.franja === numFranja);
+                const obligatorios = enFranja.filter(r => r.isUnlisted);
+                const competidores = enFranja.filter(r => !r.isUnlisted).sort(funcOrden);
+                const capacidadRestante = Math.max(0, limite - obligatorios.length);
+                const aceptadosListados = competidores.slice(0, capacidadRestante);
+                const rechazadosListados = competidores.slice(capacidadRestante).map(r => ({...r, nombreFranja: `Excede Franja ${numFranja}`}));
+                
+                return {
+                    aceptados: [...obligatorios, ...aceptadosListados],
+                    rechazados: rechazadosListados
+                };
+            };
+
+            const resF1 = procesarCapacidad(procesados, limF1, 1);
+            const resF2 = procesarCapacidad(procesados, limF2, 2);
+            const resF3 = procesarCapacidad(procesados, limF3, 3);
+
+            const resultadosFinales = [...resF1.aceptados, ...resF2.aceptados, ...resF3.aceptados];
+            const resultadosRechazados = [...resF1.rechazados, ...resF2.rechazados, ...resF3.rechazados, ...rechazadosFueraFranja];
+
+            // ACTUALIZAR DASHBOARD
+            const totalSolicitudes = procesados.length + rechazadosFueraFranja.length;
+            document.getElementById('metTotal').innerText = totalSolicitudes;
+            document.getElementById('metAceptar').innerText = resultadosFinales.length;
+            document.getElementById('metRechazar').innerText = resultadosRechazados.length - rechazadosFueraFranja.length;
+            document.getElementById('metFueraHorario').innerText = rechazadosFueraFranja.length;
+            
+            document.getElementById('panelMetricas').style.display = 'grid';
+
+            // RENDERIZAR TABLA ROJA
+            const tbodyRechazados = document.getElementById('cuerpoTablaRechazados');
+            const seccionRechazados = document.getElementById('seccionRechazados');
+            const mensajeExitoTotal = document.getElementById('mensajeExitoTotal');
+            
+            tbodyRechazados.innerHTML = '';
+
+            if (resultadosRechazados.length === 0) {
+                seccionRechazados.style.display = 'none'; 
+                mensajeExitoTotal.style.display = 'block'; 
+            } else {
+                seccionRechazados.style.display = 'block'; 
+                mensajeExitoTotal.style.display = 'none'; 
+                
+                // Mantenemos la clase dinámicamente al generar las filas según el estado actual del botón toggle
+                const claseOculta = columnasVisibles ? "" : "hidden-col";
+
+                resultadosRechazados.forEach((r, index) => {
+                    const tr = document.createElement('tr');
+                    const strMed = r.isUnlisted ? "No Listado (Bypass)" : `Nv ${r.pMed}`;
+                    
+                    tr.innerHTML = `
+                        <td style="text-align: center;"><strong>${index + 1}</strong></td>
+                        <td><strong>${r.pabCama}</strong></td>
+                        <td>${r.med}</td>
+                        <td>${r.horaFormateada}</td>
+                        <td style="text-align: center;">
+                            <input type="checkbox" class="large-checkbox" title="Marcar como registrado">
+                        </td>
+                        <td class="col-extra ${claseOculta}"><strong>${r.nombreFranja}</strong></td>
+                        <td class="col-extra ${claseOculta}"><span style="font-size:0.9em; font-weight:bold; color:var(--danger);">Med: ${strMed}</span></td>
+                    `;
+                    tbodyRechazados.appendChild(tr);
+                });
+            }
+        }
+
+        window.onload = validarLimites;
+    </script>
+</body>
+</html>
