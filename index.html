@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Herramienta de Filtrado de Medicamentos</title>
+    <title>Herramienta de Filtrado de Medicamentos IV</title>
     <style>
         :root {
             --primary: #0056b3;
@@ -11,6 +11,7 @@
             --success: #28a745;
             --danger: #dc3545;
             --warning: #ffc107;
+            --orange: #fd7e14;
             --bg: #f4f7f6;
             --card-bg: #ffffff;
             --border: #ccc;
@@ -42,6 +43,10 @@
         input[type="number"] {
             width: 80px; padding: 5px; margin-top: 5px; border-radius: 4px; border: 1px solid var(--border);
         }
+        select {
+            width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid var(--border);
+            font-size: 1em; background: #fff; box-sizing: border-box;
+        }
         textarea {
             width: 100%; height: 200px; padding: 10px; margin-top: 10px;
             border-radius: 4px; border: 1px solid var(--border); font-family: monospace;
@@ -55,16 +60,16 @@
         button:hover { background-color: #004494; }
         .btn-info { background-color: var(--secondary); width: auto; margin-top: 10px;}
         .btn-info:hover { background-color: #138496; }
-        
+
         .alert {
             padding: 15px; margin-top: 20px; border-radius: 4px; display: none; font-weight: bold; font-size: 1.1em;
         }
         .alert.error { background-color: #f8d7da; color: #721c24; display: block; }
         .alert.success { background-color: #d4edda; color: #155724; display: block; border: 1px solid #c3e6cb;}
-        
+
         /* Dashboard de Métricas */
         .metrics-container {
-            display: none; 
+            display: none;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
@@ -79,8 +84,8 @@
         .metric-card.bg-blue { background-color: var(--primary); }
         .metric-card.bg-green { background-color: var(--success); }
         .metric-card.bg-red { background-color: var(--danger); }
-        .metric-card.bg-orange { background-color: #fd7e14; }
-        
+        .metric-card.bg-orange { background-color: var(--orange); }
+
         .metric-title {
             font-size: 0.85em;
             font-weight: bold;
@@ -99,7 +104,7 @@
         th, td {
             border: 1px solid var(--border); padding: 10px; text-align: left;
         }
-        
+
         /* Estilos Tabla de Rechazados (La única visible) */
         .table-red th { background-color: var(--danger); color: white; border-color: #c82333; }
         .table-red td { border-color: #f5c6cb; }
@@ -119,26 +124,34 @@
         }
 
         .help-text { font-size: 0.85em; color: #666; margin-bottom: 10px; line-height: 1.4;}
-        
+
+        /* Badges de riesgo */
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; font-weight: bold; color: #fff; }
+        .badge-alto { background-color: var(--danger); }
+        .badge-medio { background-color: var(--orange); }
+        .badge-bajo { background-color: var(--success); }
+        .badge-obl { background-color: var(--primary); }
+        .badge-excl { background-color: #6f42c1; }
+
         /* Estilos del Modal */
         .modal {
-            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; 
-            overflow: auto; background-color: rgba(0,0,0,0.5); 
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5);
         }
         .modal-content {
-            background-color: #fff; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%; 
+            background-color: #fff; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%;
             max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 80vh; display: flex; flex-direction: column;
         }
         .modal-header {
-            display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); 
+            display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);
             padding-bottom: 10px; margin-bottom: 10px;
         }
         .modal-header h2 { margin: 0; }
         .close-btn { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
         .close-btn:hover, .close-btn:focus { color: black; }
         .modal-body { overflow-y: auto; padding-right: 10px; }
-        .modal-body ol { padding-left: 20px; margin: 0; }
-        .modal-body li { padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+        .modal-body ol { padding-left: 22px; margin: 0 0 10px; }
+        .modal-body li { padding: 5px 0; border-bottom: 1px solid #f0f0f0; }
         .modal-body li:last-child { border-bottom: none; }
 
         @media (max-width: 768px) {
@@ -150,33 +163,35 @@
 
     <div class="container">
         <div class="full-width">
-            <h1>Filtrado de Preparación de Medicamentos</h1>
-            <p>Pegue los datos desde Excel. El sistema aplicará los límites de capacidad basándose en la jerarquía. <br>
-            <strong>Regla Especial:</strong> Si un medicamento <strong>NO</strong> está en la lista de jerarquía, el sistema lo asume automáticamente como <strong>PREPARACIÓN OBLIGATORIA</strong> y garantizará su espacio.</p>
-            <button class="btn-info" onclick="abrirModal()">Ver Jerarquía de Medicamentos</button>
+            <h1>Filtrado de Preparación de Medicamentos IV</h1>
+            <p>Herramienta basada en el <strong>Protocolo de restricción en la preparación de medicamentos intravenosos</strong>.
+            Pegue los datos desde Excel; el sistema aplica la restricción por <strong>riesgo de preparación</strong> (iniciando por Riesgo Bajo en orden inverso) y por <strong>área hospitalaria</strong>.<br>
+            <strong>Reglas del protocolo:</strong> las <strong>Mezclas</strong> y los medicamentos <strong>no clasificados</strong> se asumen como <strong>PREPARACIÓN OBLIGATORIA</strong>; las áreas <strong>UCIN y UCIA quedan excluidas</strong> de la restricción (siempre se preparan).</p>
+            <button class="btn-info" onclick="abrirModal()">Ver Jerarquía / Clasificación de Riesgo</button>
         </div>
 
         <div class="card">
             <h2>Configuración de Límites</h2>
-            
-            <label>Capacidad Total Diaria:</label>
+
+            <label>Turno de operación:</label>
+            <select id="selTurno" onchange="cambiarTurno()">
+                <option value="nocturno">Nocturno (umbral 65)</option>
+                <option value="matutino">Matutino (umbral 40)</option>
+                <option value="vespertino">Vespertino (umbral 35)</option>
+            </select>
+            <div class="help-text" style="margin-top:6px;">La restricción solo se activa para las solicitudes que <strong>exceden</strong> el umbral del turno.</div>
+
+            <label>Capacidad Total del Turno:</label>
             <input type="number" id="capTotal" value="65" oninput="validarLimites()">
 
-            <label>Franja 1 (00:00 - 04:00):</label>
-            <input type="number" id="limF1" value="20" oninput="validarLimites()">
+            <div id="contenedorFranjas"></div>
 
-            <label>Franja 2 (05:00 - 07:00):</label>
-            <input type="number" id="limF2" value="20" oninput="validarLimites()">
-
-            <label>Franja 3 (08:00 - 10:00):</label>
-            <input type="number" id="limF3" value="25" oninput="validarLimites()">
-
-            <div id="alertaLimites" class="alert success" style="padding:10px; font-size:1em;">Límites correctos. Las franjas suman 65.</div>
+            <div id="alertaLimites" class="alert success" style="padding:10px; font-size:1em;"></div>
 
             <h2>Datos de Entrada</h2>
-            <div class="help-text">Pegue su listado aquí abajo (acepta columnas de Excel o texto con espacios):</div>
-            <textarea id="datosEntrada" placeholder="CO5 00:00 Merrem 1g = 100mL ss&#10;GU12 00:00 Nexium 40mg = 10mL ss"></textarea>
-            
+            <div class="help-text">Pegue su listado aquí abajo (acepta columnas de Excel o texto con espacios). Formato de área: código + cama (ej. <strong>CO5</strong>, <strong>GU12</strong>, <strong>UCIN3</strong>):</div>
+            <textarea id="datosEntrada" placeholder="CO5 00:00 Merrem 1g = 100mL ss&#10;GU12 00:30 Nexium 40mg = 10mL ss&#10;EH8 01:00 Supradol 30mg ss&#10;UCIN2 02:00 Tradol 100mg ss"></textarea>
+
             <button onclick="procesarMedicamentos()">Filtrar y Procesar</button>
         </div>
 
@@ -193,7 +208,7 @@
                     <div class="metric-value" id="metAceptar">0</div>
                 </div>
                 <div class="metric-card bg-red">
-                    <div class="metric-title">Sin Preparar</div>
+                    <div class="metric-title">Restringidos</div>
                     <div class="metric-value" id="metRechazar">0</div>
                 </div>
                 <div class="metric-card bg-orange">
@@ -203,12 +218,12 @@
             </div>
 
             <div id="seccionRechazados" style="display: none; margin-top: 30px;">
-                <h3 style="color: var(--danger); margin-bottom: 5px;">⚠️ Listado de Medicamentos NO Preparados</h3>
+                <h3 style="color: var(--danger); margin-bottom: 5px;">⚠️ Listado de Medicamentos NO Preparados (Restringidos)</h3>
                 <div class="help-text" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <span>Estos medicamentos son conocidos pero tuvieron que ser descartados por exceder la capacidad, o están fuera del horario. Utiliza la casilla para marcar los que ya registraste.</span>
-                    <button id="btnToggleColumnas" onclick="toggleDetallesExtra()" class="btn-info" style="width: auto; margin-top: 0; padding: 6px 12px; font-size: 0.9em;">👁️ Mostrar Detalles (Motivo / Importancia)</button>
+                    <span>Estos medicamentos fueron descartados por exceder la capacidad (empezando por Riesgo Bajo y el área de mayor orden de restricción) o están fuera del horario. Utiliza la casilla para marcar los que ya registraste.</span>
+                    <button id="btnToggleColumnas" onclick="toggleDetallesExtra()" class="btn-info" style="width: auto; margin-top: 0; padding: 6px 12px; font-size: 0.9em;">👁️ Mostrar Detalles (Motivo / Riesgo)</button>
                 </div>
-                
+
                 <div style="overflow-x: auto;">
                     <table id="tablaRechazados" class="table-red">
                         <thead>
@@ -219,7 +234,7 @@
                                 <th>Horario</th>
                                 <th style="text-align: center; width: 90px;">Registrado</th>
                                 <th class="col-extra hidden-col">Motivo / Franja</th>
-                                <th class="col-extra hidden-col">Nivel de Importancia</th>
+                                <th class="col-extra hidden-col">Riesgo / Nivel</th>
                             </tr>
                         </thead>
                         <tbody id="cuerpoTablaRechazados">
@@ -229,7 +244,7 @@
             </div>
 
             <div id="mensajeExitoTotal" class="alert success" style="display: none; text-align: center;">
-                🎉 ¡Excelente! La capacidad es suficiente.<br><strong>Todos los medicamentos de la lista (dentro del horario) se van a preparar.</strong>
+                🎉 ¡Excelente! La capacidad es suficiente.<br><strong>Todas las solicitudes (dentro del horario) se van a preparar.</strong>
             </div>
 
         </div>
@@ -238,42 +253,207 @@
     <div id="modalJerarquia" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Jerarquía de Prioridad</h2>
+                <h2>Clasificación por Riesgo de Preparación</h2>
                 <span class="close-btn" onclick="cerrarModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p class="help-text">El Nivel 1 es el más importante (último en descartarse). <br><strong>Importante:</strong> Cualquier medicamento que NO esté en esta lista, se auto-aprueba y no compite por cupo.</p>
-                <ol id="listaModal">
-                    </ol>
+                <p class="help-text">La restricción inicia en <strong>Riesgo Bajo en orden inverso</strong> (de abajo hacia arriba de su lista) y continúa hacia Riesgo Medio y Alto. Por tanto <strong>Nivel 1 = máxima protección</strong> (último en restringirse). Los medicamentos <strong>no listados</strong> (mezclas) y las áreas <strong>UCIN/UCIA</strong> no compiten por cupo.</p>
+                <div id="listaModal"></div>
             </div>
         </div>
     </div>
 
     <script>
-        const listaMedicamentos = [
-            "Omeprazol Infusión", "Glypressin", "Miccil", "Avapena", "Voltaren", "Dorixina",
-            "Clonixinato de lisina", "Haloperidol", "Vessel Due", "Solidtrax", "Somazina",
-            "Tronium", "Nexium", "Pantozol", "Prazolna", "Dicynone", "Hioscina", "Alin",
-            "Lasix", "Stadium", "Keral", "Velian", "Carnotprim", "Dynastat", "Inhibitron",
-            "Pentren", "Supradol", "Dolac", "Onemer", "Krunamina", "Relacum", "Bufigen",
-            "Diomati", "K-50", "Graten", "Fenaten", "Supradol Duet", "Keppra", "Libertrim",
-            "Solu-Medrol", "Metilprednisolona", "Alnex", "Tradol", "Pisazol"
+        /* =========================================================
+           TABLA 1 — Clasificación de preparaciones IV por Riesgo.
+           El ORDEN del arreglo define la prioridad de preparación:
+             índice 0  = Nivel 1 = MÁXIMA protección (último en restringirse)
+             último    = primero en restringirse
+           Construido como: Riesgo Alto -> Medio -> Bajo, conservando
+           dentro de cada grupo el orden de la tabla (mayor volumen arriba),
+           de modo que la restricción cae primero en el fondo de Riesgo Bajo
+           (orden inverso) tal como exige el punto 3 del protocolo.
+           Cada entrada incluye nombre genérico y comerciales para el match.
+           ========================================================= */
+        const clasificacionMedicamentos = [
+            // ====== RIESGO ALTO (máxima protección) ======
+            { riesgo: "Alto",  generico: "Gluconato de calcio",      nombres: ["Gluconato de calcio", "Solución GC", "Solucion GC"] },
+            { riesgo: "Alto",  generico: "Buprenorfina",             nombres: ["Buprenorfina", "Brospina", "Temgesic"] },
+            { riesgo: "Alto",  generico: "Sulfato de Magnesio",      nombres: ["Sulfato de Magnesio", "Magnefusin"] },
+            { riesgo: "Alto",  generico: "Diazepam",                 nombres: ["Diazepam", "Relazepam", "Valium"] },
+            { riesgo: "Alto",  generico: "Fentanilo",                nombres: ["Fentanilo", "Fenodid"] },
+            // ====== RIESGO MEDIO ======
+            { riesgo: "Medio", generico: "Tramadol",                 nombres: ["Tramadol", "Tradol", "Pisazol"] },
+            { riesgo: "Medio", generico: "Metamizol",                nombres: ["Metamizol", "Alnex"] },
+            { riesgo: "Medio", generico: "Metilprednisolona",        nombres: ["Metilprednisolona", "Solu-Medrol", "Solumedrol"] },
+            { riesgo: "Medio", generico: "Trimebutina",              nombres: ["Trimebutina", "Libertrim"] },
+            { riesgo: "Medio", generico: "Levetiracetam",            nombres: ["Levetiracetam", "Keppra", "Kensialep"] },
+            { riesgo: "Medio", generico: "Ketorolaco/Tramadol",      nombres: ["Ketorolaco/Tramadol", "Supradol Duet", "Sinergix"] },
+            { riesgo: "Medio", generico: "Fenitoína",                nombres: ["Fenitoína", "Fenitoina", "Fenaten", "Epamin"] },
+            { riesgo: "Medio", generico: "Butilhioscina/Metamizol",  nombres: ["Butilhioscina/Metamizol", "Buscapina Compuesta", "Pasmodil"] },
+            { riesgo: "Medio", generico: "Morfina",                  nombres: ["Morfina", "Graten"] },
+            { riesgo: "Medio", generico: "Menadiona (Vitamina K)",   nombres: ["Menadiona", "Vitamina K", "Diomati", "K-50"] },
+            { riesgo: "Medio", generico: "Nalbufina",                nombres: ["Nalbufina", "Bufigen"] },
+            { riesgo: "Medio", generico: "Midazolam",                nombres: ["Midazolam", "Relacum"] },
+            { riesgo: "Medio", generico: "Lacosamida",               nombres: ["Lacosamida", "Vimpat"] },
+            { riesgo: "Medio", generico: "Dexmedetomidina",          nombres: ["Dexmedetomidina", "Krunamina", "Precedex"] },
+            { riesgo: "Medio", generico: "Ácido Valpróico",          nombres: ["Ácido Valpróico", "Acido Valproico", "Valproico", "Depakene"] },
+            // ====== RIESGO BAJO (primero en restringirse — orden inverso) ======
+            { riesgo: "Bajo",  generico: "Ketorolaco",               nombres: ["Ketorolaco", "Supradol", "Dolac", "Onemer"] },
+            { riesgo: "Bajo",  generico: "Omeprazol",                nombres: ["Omeprazol", "Inhibitron", "Pentren"] },
+            { riesgo: "Bajo",  generico: "Parecoxib",                nombres: ["Parecoxib", "Dynastat", "Pixiba"] },
+            { riesgo: "Bajo",  generico: "Metoclopramida",           nombres: ["Metoclopramida", "Carnotprim", "Pramotil"] },
+            { riesgo: "Bajo",  generico: "Dexketoprofeno",           nombres: ["Dexketoprofeno", "Stadium", "Keral", "Velian"] },
+            { riesgo: "Bajo",  generico: "Furosemida",               nombres: ["Furosemida", "Lasix"] },
+            { riesgo: "Bajo",  generico: "Dexametasona",             nombres: ["Dexametasona", "Alin", "Decorex"] },
+            { riesgo: "Bajo",  generico: "Hioscina",                 nombres: ["Hioscina", "Buscapina"] },
+            { riesgo: "Bajo",  generico: "Hidrocortisona",           nombres: ["Hidrocortisona"] },
+            { riesgo: "Bajo",  generico: "Etamsilato",               nombres: ["Etamsilato", "Dicynone", "Caphemasil"] },
+            { riesgo: "Bajo",  generico: "Pantoprazol",              nombres: ["Pantoprazol", "Prazolan", "Pantozol", "Zoltum"] },
+            { riesgo: "Bajo",  generico: "Difenidol",                nombres: ["Difenidol", "Vontrol"] },
+            { riesgo: "Bajo",  generico: "Esomeprazol",              nombres: ["Esomeprazol", "Tronium", "Nexium"] },
+            { riesgo: "Bajo",  generico: "Citicolina",               nombres: ["Citicolina", "Somazina"] },
+            { riesgo: "Bajo",  generico: "Ácido tranexámico",        nombres: ["Ácido tranexámico", "Acido tranexamico", "Tranexámico", "Solidtrax", "Tranexamic Acid", "Agetax"] },
+            { riesgo: "Bajo",  generico: "Sulodexina",               nombres: ["Sulodexina", "Vessel Due"] },
+            { riesgo: "Bajo",  generico: "Haloperidol",              nombres: ["Haloperidol", "Haloperil"] },
+            { riesgo: "Bajo",  generico: "Clonixinato de Lisina",    nombres: ["Clonixinato de Lisina", "Clonixinato de lisina", "Dorixina", "Firac"] },
+            { riesgo: "Bajo",  generico: "Diclofenaco",              nombres: ["Diclofenaco", "Voltaren"] },
+            { riesgo: "Bajo",  generico: "Cloropiramina",            nombres: ["Cloropiramina", "Avapena"] },
+            { riesgo: "Bajo",  generico: "Bumetanida",               nombres: ["Bumetanida", "Miccil"] },
+            { riesgo: "Bajo",  generico: "Terlipresina",             nombres: ["Terlipresina", "Glypressin"] },
+            { riesgo: "Bajo",  generico: "Aminofilina",              nombres: ["Aminofilina", "Aminofilin", "Amofilin"] },
+            { riesgo: "Bajo",  generico: "Fitomenadiona",            nombres: ["Fitomenadiona", "Unokavi"] },
+            { riesgo: "Bajo",  generico: "Omeprazol Infusión",       nombres: ["Omeprazol Infusión", "Omeprazol Infusion", "Inhibitron Infusión", "Inhibitron Infusion"] },
+            { riesgo: "Bajo",  generico: "Lisina/Pargeverina",       nombres: ["Lisina/Pargeverina", "Pargeverina", "Firac Plus"] },
+            { riesgo: "Bajo",  generico: "Betametasona",             nombres: ["Betametasona", "Erispan"] },
+            { riesgo: "Bajo",  generico: "Ketoprofeno",              nombres: ["Ketoprofeno", "Profenid"] },
+            { riesgo: "Bajo",  generico: "Cerebrolysin",             nombres: ["Cerebrolysin", "Cerebrolisina", "Renacenz"] },
+            { riesgo: "Bajo",  generico: "Clonixinato de lisina/Hioscina", nombres: ["Clonixinato de lisina/Hioscina", "Espacil Compuesto", "Espacil"] },
+            { riesgo: "Bajo",  generico: "Floroglucinol/Trimetilfloroglucinol", nombres: ["Floroglucinol", "Trimetilfloroglucinol", "Panclasa"] }
         ];
 
+        /* === Orden de restricción por área (punto 4 del protocolo) ===
+           Menor número = se restringe PRIMERO (menos protegido).
+           Mayor número = se restringe AL FINAL (más protegido).
+           UCIN y UCIA quedan EXCLUIDAS: nunca se restringen.
+           Códigos confirmados: EH, PI, SG, MA, GU, CO.            */
+        const RESTRICCION_AREA = { "EH": 1, "PI": 2, "SG": 3, "MA": 4, "GU": 5, "CO": 6 };
+        const AREAS_EXCLUIDAS = ["UCIN", "UCIA"];
+        const RANK_AREA_DESCONOCIDA = 99; // área no reconocida: se protege (fail-open) y se avisa en consola
+
+        /* === Turnos (punto 1 del protocolo) ===
+           El nocturno conserva las 3 franjas; matutino y vespertino usan
+           una sola franja que cubre todo el día con su umbral total.       */
+        const TURNOS = {
+            nocturno: {
+                nombre: "Nocturno", total: 65,
+                franjas: [
+                    { id: 1, etiqueta: "Franja 1 (00:00 - 04:00)", min: 0,   max: 240,  limite: 20 },
+                    { id: 2, etiqueta: "Franja 2 (05:00 - 07:00)", min: 300, max: 420,  limite: 20 },
+                    { id: 3, etiqueta: "Franja 3 (08:00 - 10:00)", min: 480, max: 600,  limite: 25 }
+                ]
+            },
+            matutino: {
+                nombre: "Matutino", total: 40,
+                franjas: [ { id: 1, etiqueta: "Turno Matutino (umbral 40)", min: 0, max: 1439, limite: 40 } ]
+            },
+            vespertino: {
+                nombre: "Vespertino", total: 35,
+                franjas: [ { id: 1, etiqueta: "Turno Vespertino (umbral 35)", min: 0, max: 1439, limite: 35 } ]
+            }
+        };
+
+        let turnoActual = "nocturno";
         let columnasVisibles = false;
 
-        // ---- Funciones de Interfaz ----
-        function abrirModal() {
-            const modal = document.getElementById('modalJerarquia');
-            const listaUI = document.getElementById('listaModal');
-            if(listaUI.children.length === 0) {
-                listaMedicamentos.forEach((med, index) => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<strong>Nivel ${index + 1}:</strong> ${med}`;
-                    listaUI.appendChild(li);
+        // ---- Utilidades de texto / matching ----
+        const RE_DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
+        function normaliza(s) {
+            return (s || "").toLowerCase().normalize("NFD").replace(RE_DIACRITICOS, "");
+        }
+        function escapeRegex(s) {
+            return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }
+
+        /* Clasifica un texto de medicamento contra la tabla de riesgo.
+           Usa coincidencia por palabra completa (con bordes) y elige el
+           alias MÁS LARGO que coincida, para distinguir casos como
+           "Buscapina" vs "Buscapina Compuesta" o "Inhibitron" vs
+           "Inhibitron Infusión". Devuelve obligatorio si no hay match. */
+        function clasificarMed(medText) {
+            const t = normaliza(medText);
+            let mejor = null, mejorLen = -1;
+            clasificacionMedicamentos.forEach((entry, idx) => {
+                entry.nombres.forEach(nombre => {
+                    const n = normaliza(nombre);
+                    if (n.length <= mejorLen) return;
+                    const re = new RegExp("(^|[^a-z0-9])" + escapeRegex(n) + "([^a-z0-9]|$)");
+                    if (re.test(t)) {
+                        mejorLen = n.length;
+                        mejor = { pMed: idx + 1, riesgo: entry.riesgo, generico: entry.generico };
+                    }
                 });
+            });
+            if (mejor) return { ...mejor, isUnlisted: false };
+            return { pMed: 999, riesgo: null, generico: null, isUnlisted: true };
+        }
+
+        // ---- Funciones de Interfaz ----
+        function cambiarTurno() {
+            turnoActual = document.getElementById('selTurno').value;
+            renderFranjas();
+        }
+
+        function renderFranjas() {
+            const turno = TURNOS[turnoActual];
+            document.getElementById('capTotal').value = turno.total;
+            const cont = document.getElementById('contenedorFranjas');
+            cont.innerHTML = turno.franjas.map(f => `
+                <label>${f.etiqueta}:</label>
+                <input type="number" class="inpFranja" data-fid="${f.id}" value="${f.limite}" oninput="validarLimites()">
+            `).join('');
+            validarLimites();
+        }
+
+        function validarLimites() {
+            const total = parseInt(document.getElementById('capTotal').value) || 0;
+            let suma = 0;
+            document.querySelectorAll('.inpFranja').forEach(i => suma += (parseInt(i.value) || 0));
+            const alerta = document.getElementById('alertaLimites');
+
+            if (suma === total) {
+                alerta.className = 'alert success';
+                alerta.innerText = `CORRECTO: las franjas suman ${suma}, coincidiendo con el umbral del turno.`;
+            } else {
+                alerta.className = 'alert error';
+                alerta.innerText = `¡ALERTA! Las franjas suman ${suma}, pero la capacidad del turno es ${total}.`;
             }
-            modal.style.display = 'block';
+        }
+
+        function abrirModal() {
+            const cont = document.getElementById('listaModal');
+            if (!cont.dataset.rendered) {
+                const grupos = { Alto: [], Medio: [], Bajo: [] };
+                clasificacionMedicamentos.forEach((e, i) => grupos[e.riesgo].push({ ...e, nivel: i + 1 }));
+                const meta = {
+                    Alto:  { clase: "badge-alto",  desc: "Máxima protección — son los últimos en restringirse." },
+                    Medio: { clase: "badge-medio", desc: "Se restringen después de agotar Riesgo Bajo." },
+                    Bajo:  { clase: "badge-bajo",  desc: "Primeros en restringirse, en orden inverso (de abajo hacia arriba de esta lista)." }
+                };
+                let html = "";
+                ["Alto", "Medio", "Bajo"].forEach(r => {
+                    html += `<h3 style="margin:14px 0 4px;"><span class="badge ${meta[r].clase}">Riesgo ${r}</span></h3>`;
+                    html += `<p class="help-text" style="margin:0 0 6px;">${meta[r].desc}</p><ol>`;
+                    grupos[r].forEach(e => {
+                        const brands = e.nombres.filter(n => n !== e.generico).join(", ");
+                        html += `<li><strong>Nivel ${e.nivel}: ${e.generico}</strong>${brands ? ` <span style="color:#666;">(${brands})</span>` : ""}</li>`;
+                    });
+                    html += `</ol>`;
+                });
+                cont.innerHTML = html;
+                cont.dataset.rendered = "1";
+            }
+            document.getElementById('modalJerarquia').style.display = 'block';
         }
 
         function cerrarModal() {
@@ -293,42 +473,40 @@
             const btnToggle = document.getElementById('btnToggleColumnas');
 
             elementosExtra.forEach(el => {
-                if(columnasVisibles) {
+                if (columnasVisibles) {
                     el.classList.remove('hidden-col');
                 } else {
                     el.classList.add('hidden-col');
                 }
             });
 
-            if(columnasVisibles) {
-                btnToggle.innerText = "👁️ Ocultar Detalles (Motivo / Importancia)";
-            } else {
-                btnToggle.innerText = "👁️ Mostrar Detalles (Motivo / Importancia)";
-            }
+            btnToggle.innerText = columnasVisibles
+                ? "👁️ Ocultar Detalles (Motivo / Riesgo)"
+                : "👁️ Mostrar Detalles (Motivo / Riesgo)";
         }
 
-        function validarLimites() {
-            const total = parseInt(document.getElementById('capTotal').value) || 0;
-            const f1 = parseInt(document.getElementById('limF1').value) || 0;
-            const f2 = parseInt(document.getElementById('limF2').value) || 0;
-            const f3 = parseInt(document.getElementById('limF3').value) || 0;
-            const suma = f1 + f2 + f3;
-            const alerta = document.getElementById('alertaLimites');
-            
-            if (suma === total) {
-                alerta.className = 'alert success';
-                alerta.innerText = `CORRECTO: Las franjas suman ${suma}, coincidiendo con el total diario.`;
-            } else {
-                alerta.className = 'alert error';
-                alerta.innerText = `¡ALERTA! Las franjas suman ${suma}, pero la capacidad total es ${total}.`;
+        function clasificaFranja(totalMins, turno) {
+            for (const f of turno.franjas) {
+                if (totalMins >= f.min && totalMins <= f.max) return f;
             }
+            return null; // fuera de horario del turno
+        }
+
+        function etiquetaRiesgo(r) {
+            if (r.excluidaArea) return `<span class="badge badge-excl">Excluida UCIN/UCIA</span>`;
+            if (r.isUnlisted)   return `<span class="badge badge-obl">No clasificado · Obligatorio</span>`;
+            const clase = r.riesgo === "Alto" ? "badge-alto" : (r.riesgo === "Medio" ? "badge-medio" : "badge-bajo");
+            return `<span class="badge ${clase}">Riesgo ${r.riesgo}</span> <span style="font-size:0.9em; font-weight:bold;">Nv ${r.pMed}</span>`;
         }
 
         // ---- Motor de Filtrado ----
         function procesarMedicamentos() {
-            const limF1 = parseInt(document.getElementById('limF1').value) || 0;
-            const limF2 = parseInt(document.getElementById('limF2').value) || 0;
-            const limF3 = parseInt(document.getElementById('limF3').value) || 0;
+            const turno = TURNOS[turnoActual];
+            // Leer los límites actuales de las franjas desde la interfaz.
+            const franjas = turno.franjas.map(f => {
+                const inp = document.querySelector(`.inpFranja[data-fid="${f.id}"]`);
+                return { ...f, limite: inp ? (parseInt(inp.value) || 0) : f.limite };
+            });
 
             const rawData = document.getElementById('datosEntrada').value.trim();
             if (!rawData) {
@@ -356,21 +534,21 @@
                 if (fila.includes('\t')) {
                     const columnas = fila.split('\t');
                     let idxHora = columnas.findIndex(c => c.includes(horaOriginal));
-                    
-                    if (idxHora === 1) { 
+
+                    if (idxHora === 1) {
                         pabCama = columnas[0];
                         med = columnas.slice(2).join(" ");
-                    } else if (idxHora === 2) { 
+                    } else if (idxHora === 2) {
                         pabCama = columnas[0];
                         med = columnas[1];
-                    } else { 
+                    } else {
                         pabCama = columnas[1] || "";
                         med = columnas.slice(2).join(" ");
                     }
                 } else {
                     let filaSinHora = fila.replace(timeMatch[0], "|||");
                     let partes = filaSinHora.split("|||");
-                    
+
                     if (partes[0].trim() !== "" && partes[1] && partes[1].trim() !== "") {
                         pabCama = partes[0].trim();
                         med = partes[1].trim();
@@ -397,105 +575,107 @@
                 const camaNum = matchExtractPab ? parseInt(matchExtractPab[2], 10) : 999;
                 const pabCamaLimpio = matchExtractPab ? `${pabCodigo} ${camaNum}` : pabCama;
 
-                let pMed = 99; 
-                let isUnlisted = true; 
-                
-                for (let m = 0; m < listaMedicamentos.length; m++) {
-                    if (med.toLowerCase().includes(listaMedicamentos[m].toLowerCase())) {
-                        pMed = m + 1;
-                        isUnlisted = false; 
-                        break;
-                    }
+                // Área: exclusión (UCIN/UCIA) y rango de restricción
+                const excluidaArea = AREAS_EXCLUIDAS.includes(pabCodigo);
+                let rankArea = RESTRICCION_AREA[pabCodigo];
+                if (rankArea === undefined && !excluidaArea) {
+                    rankArea = RANK_AREA_DESCONOCIDA;
+                    console.warn(`Área no reconocida: "${pabCodigo}" (cama ${camaNum}). Se protege por defecto; verifica el código.`);
                 }
 
+                // Clasificación por riesgo
+                const clasif = clasificarMed(med);
+
+                // Horario -> minutos
                 let horas = 0, mins = 0;
-                let horaLimpia = horaOriginal.replace(/[^\d:]/g, ''); 
+                let horaLimpia = horaOriginal.replace(/[^\d:]/g, '');
                 const partesHora = horaLimpia.split(":");
                 if (partesHora.length >= 2) {
                     horas = parseInt(partesHora[0]) || 0;
                     mins = parseInt(partesHora[1]) || 0;
                 }
-
                 const totalMins = (horas * 60) + mins;
-                let franja = 0;
-                let nombreFranja = "";
                 const horaFormateada = `${horas.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 
-                if (totalMins >= 0 && totalMins <= 240) { 
-                    franja = 1; nombreFranja = "Franja 1 (00:00-04:00)";
-                } else if (totalMins >= 300 && totalMins <= 420) { 
-                    franja = 2; nombreFranja = "Franja 2 (05:00-07:00)";
-                } else if (totalMins >= 480 && totalMins <= 600) { 
-                    franja = 3; nombreFranja = "Franja 3 (08:00-10:00)";
-                } else {
-                    rechazadosFueraFranja.push({
-                        pabCama: pabCamaLimpio, med, horaFormateada, franja: 0, nombreFranja: "Fuera de Horario", pMed, camaNum, isUnlisted, ordenOriginal: i
-                    });
-                    return; 
+                const base = {
+                    pabCama: pabCamaLimpio, pabCodigo, camaNum, med, horaFormateada,
+                    pMed: clasif.pMed, riesgo: clasif.riesgo, generico: clasif.generico,
+                    isUnlisted: clasif.isUnlisted, excluidaArea, rankArea: rankArea ?? RANK_AREA_DESCONOCIDA,
+                    ordenOriginal: i
+                };
+
+                const f = clasificaFranja(totalMins, turno);
+                if (!f) {
+                    rechazadosFueraFranja.push({ ...base, franja: 0, motivo: "Fuera de Horario" });
+                    return;
                 }
-                
-                procesados.push({
-                    pabCama: pabCamaLimpio, med, horaFormateada, franja, nombreFranja, pMed, camaNum, isUnlisted, ordenOriginal: i
-                });
+                procesados.push({ ...base, franja: f.id, etiquetaFranja: f.etiqueta, motivo: "" });
             });
 
+            /* Orden de competencia por cupo:
+               1) Prioridad por riesgo (Nivel 1 primero = más protegido).
+               2) Área: la de MAYOR rango de restricción primero (Covadonga),
+                  para que la de MENOR rango (Extensión Hospitalaria) se restrinja antes.
+               3) Cama y orden original como desempates estables. */
             const funcOrden = (a, b) => {
-                if (a.pMed !== b.pMed) return a.pMed - b.pMed;             
-                if (a.camaNum !== b.camaNum) return a.camaNum - b.camaNum; 
-                return a.ordenOriginal - b.ordenOriginal;                  
+                if (a.pMed !== b.pMed) return a.pMed - b.pMed;
+                if (a.rankArea !== b.rankArea) return b.rankArea - a.rankArea;
+                if (a.camaNum !== b.camaNum) return a.camaNum - b.camaNum;
+                return a.ordenOriginal - b.ordenOriginal;
             };
 
-            const procesarCapacidad = (arrProcesados, limite, numFranja) => {
-                const enFranja = arrProcesados.filter(r => r.franja === numFranja);
-                const obligatorios = enFranja.filter(r => r.isUnlisted);
-                const competidores = enFranja.filter(r => !r.isUnlisted).sort(funcOrden);
-                const capacidadRestante = Math.max(0, limite - obligatorios.length);
+            const procesarCapacidad = (arrProcesados, franja) => {
+                const enFranja = arrProcesados.filter(r => r.franja === franja.id);
+                // Obligatorios: no clasificados (mezclas) y áreas excluidas (UCIN/UCIA) -> garantizan espacio
+                const obligatorios = enFranja.filter(r => r.isUnlisted || r.excluidaArea);
+                const competidores = enFranja.filter(r => !(r.isUnlisted || r.excluidaArea)).sort(funcOrden);
+                const capacidadRestante = Math.max(0, franja.limite - obligatorios.length);
                 const aceptadosListados = competidores.slice(0, capacidadRestante);
-                const rechazadosListados = competidores.slice(capacidadRestante).map(r => ({...r, nombreFranja: `Excede Franja ${numFranja}`}));
-                
+                const rechazadosListados = competidores.slice(capacidadRestante)
+                    .map(r => ({ ...r, motivo: `Excede ${franja.etiqueta}` }));
+
                 return {
                     aceptados: [...obligatorios, ...aceptadosListados],
                     rechazados: rechazadosListados
                 };
             };
 
-            const resF1 = procesarCapacidad(procesados, limF1, 1);
-            const resF2 = procesarCapacidad(procesados, limF2, 2);
-            const resF3 = procesarCapacidad(procesados, limF3, 3);
+            let resultadosFinales = [];
+            let resultadosRechazadosCap = [];
+            franjas.forEach(f => {
+                const res = procesarCapacidad(procesados, f);
+                resultadosFinales = resultadosFinales.concat(res.aceptados);
+                resultadosRechazadosCap = resultadosRechazadosCap.concat(res.rechazados);
+            });
 
-            const resultadosFinales = [...resF1.aceptados, ...resF2.aceptados, ...resF3.aceptados];
-            const resultadosRechazados = [...resF1.rechazados, ...resF2.rechazados, ...resF3.rechazados, ...rechazadosFueraFranja];
+            const resultadosRechazados = [...resultadosRechazadosCap, ...rechazadosFueraFranja];
 
             // ACTUALIZAR DASHBOARD
             const totalSolicitudes = procesados.length + rechazadosFueraFranja.length;
             document.getElementById('metTotal').innerText = totalSolicitudes;
             document.getElementById('metAceptar').innerText = resultadosFinales.length;
-            document.getElementById('metRechazar').innerText = resultadosRechazados.length - rechazadosFueraFranja.length;
+            document.getElementById('metRechazar').innerText = resultadosRechazadosCap.length;
             document.getElementById('metFueraHorario').innerText = rechazadosFueraFranja.length;
-            
             document.getElementById('panelMetricas').style.display = 'grid';
 
             // RENDERIZAR TABLA ROJA
             const tbodyRechazados = document.getElementById('cuerpoTablaRechazados');
             const seccionRechazados = document.getElementById('seccionRechazados');
             const mensajeExitoTotal = document.getElementById('mensajeExitoTotal');
-            
+
             tbodyRechazados.innerHTML = '';
 
             if (resultadosRechazados.length === 0) {
-                seccionRechazados.style.display = 'none'; 
-                mensajeExitoTotal.style.display = 'block'; 
+                seccionRechazados.style.display = 'none';
+                mensajeExitoTotal.style.display = 'block';
             } else {
-                seccionRechazados.style.display = 'block'; 
-                mensajeExitoTotal.style.display = 'none'; 
-                
-                // Mantenemos la clase dinámicamente al generar las filas según el estado actual del botón toggle
+                seccionRechazados.style.display = 'block';
+                mensajeExitoTotal.style.display = 'none';
+
                 const claseOculta = columnasVisibles ? "" : "hidden-col";
 
                 resultadosRechazados.forEach((r, index) => {
                     const tr = document.createElement('tr');
-                    const strMed = r.isUnlisted ? "No Listado (Bypass)" : `Nv ${r.pMed}`;
-                    
                     tr.innerHTML = `
                         <td style="text-align: center;"><strong>${index + 1}</strong></td>
                         <td><strong>${r.pabCama}</strong></td>
@@ -504,15 +684,17 @@
                         <td style="text-align: center;">
                             <input type="checkbox" class="large-checkbox" title="Marcar como registrado">
                         </td>
-                        <td class="col-extra ${claseOculta}"><strong>${r.nombreFranja}</strong></td>
-                        <td class="col-extra ${claseOculta}"><span style="font-size:0.9em; font-weight:bold; color:var(--danger);">Med: ${strMed}</span></td>
+                        <td class="col-extra ${claseOculta}"><strong>${r.motivo}</strong></td>
+                        <td class="col-extra ${claseOculta}">${etiquetaRiesgo(r)}</td>
                     `;
                     tbodyRechazados.appendChild(tr);
                 });
             }
         }
 
-        window.onload = validarLimites;
+        window.onload = function() {
+            renderFranjas();
+        };
     </script>
 </body>
 </html>
