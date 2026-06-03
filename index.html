@@ -186,9 +186,13 @@
 
             <div id="infoSuma" class="help-text" style="margin-top:10px; font-style:italic;"></div>
 
+            <label style="margin-top:16px;">Franja del listado (selector):</label>
+            <select id="selFranjaListado"></select>
+            <div class="help-text" style="margin-top:6px;">Si las filas <strong>traen hora</strong>, usa <em>Automático</em> (la franja sale de la hora). Si <strong>no traen hora</strong>, elige la franja a la que pertenece todo el listado.</div>
+
             <h2>Datos de Entrada</h2>
-            <div class="help-text">Pegue su listado aquí abajo (acepta columnas de Excel o texto con espacios). Formato de área: código + cama (ej. <strong>CO5</strong>, <strong>GU12</strong>, <strong>UCIN3</strong>):</div>
-            <textarea id="datosEntrada" placeholder="CO5 00:00 Merrem 1g = 100mL ss&#10;GU12 00:30 Nexium 40mg = 10mL ss&#10;EH8 01:00 Supradol 30mg ss&#10;UCIN2 02:00 Tradol 100mg ss"></textarea>
+            <div class="help-text">Pegue su listado (Excel o texto). La <strong>hora es opcional</strong>. Formato de área: código + cama (ej. <strong>CO5</strong>, <strong>GU12</strong>, <strong>UCIN3</strong>):</div>
+            <textarea id="datosEntrada" placeholder="Con hora:  GU12 00:30 Supradol 30mg = 10mL ss&#10;Sin hora:  GU12 Supradol 30mg = 10mL ss&#10;Sin hora:  CO1&#9;Antivon 1.3mg = 20mL ss"></textarea>
 
             <button onclick="procesarMedicamentos()">Filtrar y Procesar</button>
         </div>
@@ -210,23 +214,23 @@
                     <div class="metric-value" id="metRechazar">0</div>
                 </div>
                 <div class="metric-card bg-orange">
-                    <div class="metric-title">Fuera Horario</div>
+                    <div class="metric-title">Fuera/Sin hora</div>
                     <div class="metric-value" id="metFueraHorario">0</div>
                 </div>
             </div>
 
-            <div id="seccionRechazados" style="display: none; margin-top: 30px;">
+            <div id="controlFranja" style="margin-top: 20px; padding: 12px; background: #eef4fb; border: 1px solid #cfe0f5; border-radius: 6px;">
+                <label style="margin: 0; display: inline;">Selector de franja:</label>
+                <select id="filtroFranja" onchange="renderRechazados()" style="width: auto; min-width: 280px; margin: 6px 0;"></select>
+                <div id="resumenFiltro" class="help-text" style="font-weight: bold; color: var(--text); margin: 4px 0 0;">Procesa un listado para ver los resultados por franja.</div>
+            </div>
+
+            <div id="seccionRechazados" style="display: none; margin-top: 20px;">
                 <h3 style="color: var(--danger); margin-bottom: 5px;">⚠️ Listado de Medicamentos NO Preparados (Restringidos)</h3>
                 <div class="help-text" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <span>Estos medicamentos fueron descartados por exceder la capacidad (empezando por Riesgo Bajo y el área de mayor orden de restricción) o están fuera del horario. Utiliza la casilla para marcar los que ya registraste.</span>
+                    <span>Estos medicamentos fueron descartados por exceder el límite de su franja (empezando por Riesgo Bajo y el área de mayor orden de restricción) o están fuera del horario. Utiliza la casilla para marcar los que ya registraste.</span>
                     <button id="btnToggleColumnas" onclick="toggleDetallesExtra()" class="btn-info" style="width: auto; margin-top: 0; padding: 6px 12px; font-size: 0.9em;">👁️ Mostrar Detalles (Motivo / Riesgo)</button>
                 </div>
-
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px;">
-                    <label style="margin: 0;">Filtrar por franja:</label>
-                    <select id="filtroFranja" onchange="renderRechazados()" style="width: auto; min-width: 280px; margin: 0;"></select>
-                </div>
-                <div id="resumenFiltro" class="help-text" style="font-weight: bold; color: var(--text); margin: 0 0 8px;"></div>
 
                 <div style="overflow-x: auto;">
                     <table id="tablaRechazados" class="table-red">
@@ -340,8 +344,8 @@
            Menor número = se restringe PRIMERO (menos protegido).
            Mayor número = se restringe AL FINAL (más protegido).
            UCIN y UCIA quedan EXCLUIDAS: nunca se restringen.
-           Códigos confirmados: EH, PI, SG, MA, GU, CO.            */
-        const RESTRICCION_AREA = { "EH": 1, "PI": 2, "SG": 3, "MA": 4, "GU": 5, "CO": 6 };
+           Códigos: EH, PI, SG/PS (Santiago), MA, GU, CO.            */
+        const RESTRICCION_AREA = { "EH": 1, "PI": 2, "SG": 3, "PS": 3, "MA": 4, "GU": 5, "CO": 6 };
         const AREAS_EXCLUIDAS = ["UCIN", "UCIA"];
         const RANK_AREA_DESCONOCIDA = 99; // área no reconocida: se protege (fail-open) y se avisa en consola
 
@@ -408,6 +412,14 @@
         function cambiarTurno() {
             turnoActual = document.getElementById('selTurno').value;
             renderFranjas();
+            // Las franjas cambiaron: reiniciar resultados previos y repoblar el selector.
+            ultimasStats = null;
+            ultimosRechazados = [];
+            document.getElementById('seccionRechazados').style.display = 'none';
+            document.getElementById('mensajeExitoTotal').style.display = 'none';
+            document.getElementById('resumenFiltro').innerText = 'Procesa un listado para ver los resultados por franja.';
+            poblarFiltroFranja(TURNOS[turnoActual], false);
+            poblarSelectorListado();
         }
 
         function renderFranjas() {
@@ -426,6 +438,16 @@
             document.querySelectorAll('.inpFranja').forEach(i => suma += (parseInt(i.value) || 0));
             document.getElementById('infoSuma').innerText =
                 `Suma de límites por franja: ${suma} (solo informativo — el límite se aplica por franja, nunca por turno).`;
+        }
+
+        // Selector EXTERNO de entrada: "Automático (por hora)" + forzar cada franja del turno.
+        function poblarSelectorListado() {
+            const turno = TURNOS[turnoActual];
+            const sel = document.getElementById('selFranjaListado');
+            let opts = `<option value="auto">Automático (por hora de cada fila)</option>`;
+            turno.franjas.forEach(f => { opts += `<option value="${f.id}">Forzar ${f.etiqueta}</option>`; });
+            sel.innerHTML = opts;
+            sel.value = 'auto';
         }
 
         function abrirModal() {
@@ -510,7 +532,12 @@
 
             const filas = rawData.split('\n');
             const procesados = [];
-            const rechazadosFueraFranja = [];
+            const rechazadosFueraFranja = [];   // "Fuera de Horario" y "Sin hora"
+
+            // Selector EXTERNO: franja declarada para el listado.
+            //   'auto'        -> la franja sale de la hora de cada fila.
+            //   '1' / '2'...  -> forzar esa franja a TODAS las filas (con o sin hora).
+            const modoFranja = document.getElementById('selFranjaListado').value;
 
             const timeRegex = /\b(\d{1,2}:\d{2})\b/;
 
@@ -518,50 +545,18 @@
                 fila = fila.trim();
                 if (!fila) return;
 
+                // --- Parseo tolerante: la HORA es opcional ---
                 const timeMatch = fila.match(timeRegex);
-                if (!timeMatch) return;
+                const horaStr = timeMatch ? timeMatch[1] : null;
 
-                const horaOriginal = timeMatch[1];
-                let pabCama = "";
-                let med = "";
-
-                if (fila.includes('\t')) {
-                    const columnas = fila.split('\t');
-                    let idxHora = columnas.findIndex(c => c.includes(horaOriginal));
-
-                    if (idxHora === 1) {
-                        pabCama = columnas[0];
-                        med = columnas.slice(2).join(" ");
-                    } else if (idxHora === 2) {
-                        pabCama = columnas[0];
-                        med = columnas[1];
-                    } else {
-                        pabCama = columnas[1] || "";
-                        med = columnas.slice(2).join(" ");
-                    }
-                } else {
-                    let filaSinHora = fila.replace(timeMatch[0], "|||");
-                    let partes = filaSinHora.split("|||");
-
-                    if (partes[0].trim() !== "" && partes[1] && partes[1].trim() !== "") {
-                        pabCama = partes[0].trim();
-                        med = partes[1].trim();
-                    } else {
-                        let textoRestante = fila.replace(timeMatch[0], "").trim();
-                        const matchPab = textoRestante.match(/^([a-zA-Z]+\s*\d+)/);
-                        if (matchPab) {
-                            pabCama = matchPab[1].trim();
-                            med = textoRestante.substring(matchPab[1].length).trim();
-                        } else {
-                            let palabras = textoRestante.split(/\s+/);
-                            pabCama = palabras.shift();
-                            med = palabras.join(" ");
-                        }
-                    }
-                }
-
-                pabCama = pabCama.replace(/\t/g, "").trim();
-                med = med.replace(/\t/g, "").trim();
+                // Área+cama = primer token; medicamento = el resto (quitando la hora).
+                const partes = fila.includes('\t')
+                    ? fila.split('\t').map(s => s.trim()).filter(s => s !== "")
+                    : fila.split(/\s+/);
+                let pabCama = (partes.shift() || "").trim();
+                let med = partes.join(" ");
+                if (horaStr) med = med.replace(timeMatch[0], " ");
+                med = med.replace(/\s+/g, " ").trim();
                 if (!pabCama || !med) return;
 
                 const matchExtractPab = pabCama.match(/^([a-zA-Z]+)\s*(\d+)/);
@@ -580,16 +575,16 @@
                 // Clasificación por riesgo
                 const clasif = clasificarMed(med);
 
-                // Horario -> minutos
-                let horas = 0, mins = 0;
-                let horaLimpia = horaOriginal.replace(/[^\d:]/g, '');
-                const partesHora = horaLimpia.split(":");
-                if (partesHora.length >= 2) {
-                    horas = parseInt(partesHora[0]) || 0;
-                    mins = parseInt(partesHora[1]) || 0;
+                // Horario (si viene) -> minutos
+                let totalMins = null;
+                let horaFormateada = "—";
+                if (horaStr) {
+                    const ph = horaStr.split(":");
+                    const horas = parseInt(ph[0]) || 0;
+                    const mins = parseInt(ph[1]) || 0;
+                    totalMins = (horas * 60) + mins;
+                    horaFormateada = `${horas.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
                 }
-                const totalMins = (horas * 60) + mins;
-                const horaFormateada = `${horas.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 
                 const base = {
                     pabCama: pabCamaLimpio, pabCodigo, camaNum, med, horaFormateada,
@@ -598,12 +593,23 @@
                     ordenOriginal: i
                 };
 
-                const f = clasificaFranja(totalMins, turno);
-                if (!f) {
-                    rechazadosFueraFranja.push({ ...base, franja: 0, motivo: "Fuera de Horario" });
-                    return;
+                // --- Asignación de franja (inteligente) ---
+                if (modoFranja !== 'auto') {
+                    // Franja FORZADA por el selector externo: funciona con o sin hora.
+                    const fMeta = turno.franjas.find(f => f.id === Number(modoFranja)) || turno.franjas[0];
+                    procesados.push({ ...base, franja: fMeta.id, etiquetaFranja: fMeta.etiqueta, motivo: "" });
+                } else if (totalMins !== null) {
+                    // Modo automático con hora: la franja sale de la ventana horaria.
+                    const f = clasificaFranja(totalMins, turno);
+                    if (f) {
+                        procesados.push({ ...base, franja: f.id, etiquetaFranja: f.etiqueta, motivo: "" });
+                    } else {
+                        rechazadosFueraFranja.push({ ...base, franja: 0, motivo: "Fuera de Horario" });
+                    }
+                } else {
+                    // Automático pero la fila NO trae hora: no se puede ubicar.
+                    rechazadosFueraFranja.push({ ...base, franja: 0, motivo: "Sin hora — elige una franja" });
                 }
-                procesados.push({ ...base, franja: f.id, etiquetaFranja: f.etiqueta, motivo: "" });
             });
 
             /* Orden de competencia por cupo:
@@ -674,14 +680,15 @@
             const seccionRechazados = document.getElementById('seccionRechazados');
             const mensajeExitoTotal = document.getElementById('mensajeExitoTotal');
 
+            poblarFiltroFranja(turno, rechazadosFueraFranja.length > 0);
+            renderRechazados();
+
             if (resultadosRechazados.length === 0) {
                 seccionRechazados.style.display = 'none';
                 mensajeExitoTotal.style.display = 'block';
             } else {
                 seccionRechazados.style.display = 'block';
                 mensajeExitoTotal.style.display = 'none';
-                poblarFiltroFranja(turno, rechazadosFueraFranja.length > 0);
-                renderRechazados();
             }
         }
 
@@ -691,7 +698,7 @@
             const sel = document.getElementById('filtroFranja');
             let opts = `<option value="total">Umbral total (todas las franjas)</option>`;
             turno.franjas.forEach(f => { opts += `<option value="${f.id}">${f.etiqueta}</option>`; });
-            if (hayFuera) opts += `<option value="fuera">Fuera de Horario</option>`;
+            if (hayFuera) opts += `<option value="fuera">Fuera de horario / Sin hora</option>`;
             sel.innerHTML = opts;
             sel.value = 'total';
         }
@@ -704,7 +711,7 @@
             if (filtro === 'total') {
                 el.innerHTML = `Umbral total · Turno ${s.turnoNombre} (todas las franjas, sin tope global) · Solicitadas ${s.totalSolicitadas} · A preparar ${s.totalPreparar} · <span style="color:var(--danger);">Descartar ${s.totalDescartar}</span>` + (s.fuera ? ` · Fuera de horario ${s.fuera}` : '');
             } else if (filtro === 'fuera') {
-                el.innerHTML = `Fuera de Horario · ${s.fuera} solicitud(es) sin franja válida`;
+                el.innerHTML = `Fuera de horario / Sin hora · ${s.fuera} solicitud(es) sin franja asignada`;
             } else {
                 const f = s.porFranja[filtro];
                 if (f) el.innerHTML = `${f.etiqueta} · Límite ${f.limite} · Solicitadas ${f.solicitadas} · A preparar ${f.preparar} · <span style="color:var(--danger);">Descartar ${f.descartar}</span>`;
@@ -751,6 +758,8 @@
 
         window.onload = function() {
             renderFranjas();
+            poblarSelectorListado();                        // selector externo poblado al iniciar
+            poblarFiltroFranja(TURNOS[turnoActual], false); // filtro de vista visible desde el inicio
         };
     </script>
 </body>
