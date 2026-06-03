@@ -224,6 +224,12 @@
                     <button id="btnToggleColumnas" onclick="toggleDetallesExtra()" class="btn-info" style="width: auto; margin-top: 0; padding: 6px 12px; font-size: 0.9em;">👁️ Mostrar Detalles (Motivo / Riesgo)</button>
                 </div>
 
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px;">
+                    <label style="margin: 0;">Filtrar por franja:</label>
+                    <select id="filtroFranja" onchange="renderRechazados()" style="width: auto; min-width: 280px; margin: 0;"></select>
+                </div>
+                <div id="resumenFiltro" class="help-text" style="font-weight: bold; color: var(--text); margin: 0 0 8px;"></div>
+
                 <div style="overflow-x: auto;">
                     <table id="tablaRechazados" class="table-red">
                         <thead>
@@ -365,6 +371,8 @@
 
         let turnoActual = "nocturno";
         let columnasVisibles = false;
+        let ultimosRechazados = [];   // último resultado de descartes (para el filtro por franja)
+        let ultimasStats = null;      // conteos por franja / turno del último proceso
 
         // ---- Utilidades de texto / matching ----
         const RE_DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
@@ -467,22 +475,18 @@
             }
         }
 
+        function aplicarVisibilidadColumnas() {
+            document.querySelectorAll('.col-extra').forEach(el => {
+                el.classList.toggle('hidden-col', !columnasVisibles);
+            });
+        }
+
         function toggleDetallesExtra() {
             columnasVisibles = !columnasVisibles;
-            const elementosExtra = document.querySelectorAll('.col-extra');
-            const btnToggle = document.getElementById('btnToggleColumnas');
-
-            elementosExtra.forEach(el => {
-                if (columnasVisibles) {
-                    el.classList.remove('hidden-col');
-                } else {
-                    el.classList.add('hidden-col');
-                }
-            });
-
-            btnToggle.innerText = columnasVisibles
+            document.getElementById('btnToggleColumnas').innerText = columnasVisibles
                 ? "👁️ Ocultar Detalles (Motivo / Riesgo)"
                 : "👁️ Mostrar Detalles (Motivo / Riesgo)";
+            aplicarVisibilidadColumnas();
         }
 
         function clasificaFranja(totalMins, turno) {
@@ -642,15 +646,23 @@
 
             let resultadosFinales = [];
             let resultadosRechazadosCap = [];
+            const porFranja = {};
             franjas.forEach(f => {
                 const res = procesarCapacidad(procesados, f);
                 resultadosFinales = resultadosFinales.concat(res.aceptados);
                 resultadosRechazadosCap = resultadosRechazadosCap.concat(res.rechazados);
+                porFranja[f.id] = {
+                    etiqueta: f.etiqueta,
+                    limite: f.limite,
+                    solicitadas: procesados.filter(r => r.franja === f.id).length,
+                    preparar: res.aceptados.length,
+                    descartar: res.rechazados.length
+                };
             });
 
             const resultadosRechazados = [...resultadosRechazadosCap, ...rechazadosFueraFranja];
 
-            // ACTUALIZAR DASHBOARD
+            // ACTUALIZAR DASHBOARD (totales del turno)
             const totalSolicitudes = procesados.length + rechazadosFueraFranja.length;
             document.getElementById('metTotal').innerText = totalSolicitudes;
             document.getElementById('metAceptar').innerText = resultadosFinales.length;
@@ -658,12 +670,20 @@
             document.getElementById('metFueraHorario').innerText = rechazadosFueraFranja.length;
             document.getElementById('panelMetricas').style.display = 'grid';
 
-            // RENDERIZAR TABLA ROJA
-            const tbodyRechazados = document.getElementById('cuerpoTablaRechazados');
+            // Guardar estado para el filtro por franja
+            ultimosRechazados = resultadosRechazados;
+            ultimasStats = {
+                turnoNombre: turno.nombre,
+                umbralTotal: parseInt(document.getElementById('capTotal').value) || turno.total,
+                porFranja,
+                fuera: rechazadosFueraFranja.length,
+                totalSolicitadas: totalSolicitudes,
+                totalPreparar: resultadosFinales.length,
+                totalDescartar: resultadosRechazadosCap.length
+            };
+
             const seccionRechazados = document.getElementById('seccionRechazados');
             const mensajeExitoTotal = document.getElementById('mensajeExitoTotal');
-
-            tbodyRechazados.innerHTML = '';
 
             if (resultadosRechazados.length === 0) {
                 seccionRechazados.style.display = 'none';
@@ -671,10 +691,57 @@
             } else {
                 seccionRechazados.style.display = 'block';
                 mensajeExitoTotal.style.display = 'none';
+                poblarFiltroFranja(turno, rechazadosFueraFranja.length > 0);
+                renderRechazados();
+            }
+        }
 
-                const claseOculta = columnasVisibles ? "" : "hidden-col";
+        /* Llena el selector de filtro con: Umbral total + cada franja del turno
+           (+ Fuera de Horario si aplica). El valor por defecto es "total". */
+        function poblarFiltroFranja(turno, hayFuera) {
+            const sel = document.getElementById('filtroFranja');
+            let opts = `<option value="total">Umbral total — Turno ${turno.nombre} (todas las franjas)</option>`;
+            turno.franjas.forEach(f => { opts += `<option value="${f.id}">${f.etiqueta}</option>`; });
+            if (hayFuera) opts += `<option value="fuera">Fuera de Horario</option>`;
+            sel.innerHTML = opts;
+            sel.value = 'total';
+        }
 
-                resultadosRechazados.forEach((r, index) => {
+        /* Resumen de conteos según la selección del filtro. */
+        function actualizarResumenFiltro(filtro) {
+            const s = ultimasStats;
+            const el = document.getElementById('resumenFiltro');
+            if (!s) { el.innerHTML = ''; return; }
+            if (filtro === 'total') {
+                el.innerHTML = `Turno ${s.turnoNombre} · Umbral ${s.umbralTotal} · Solicitadas ${s.totalSolicitadas} · A preparar ${s.totalPreparar} · <span style="color:var(--danger);">Descartar ${s.totalDescartar}</span>` + (s.fuera ? ` · Fuera de horario ${s.fuera}` : '');
+            } else if (filtro === 'fuera') {
+                el.innerHTML = `Fuera de Horario · ${s.fuera} solicitud(es) sin franja válida`;
+            } else {
+                const f = s.porFranja[filtro];
+                if (f) el.innerHTML = `${f.etiqueta} · Límite ${f.limite} · Solicitadas ${f.solicitadas} · A preparar ${f.preparar} · <span style="color:var(--danger);">Descartar ${f.descartar}</span>`;
+            }
+        }
+
+        /* Renderiza la tabla de descartes aplicando el filtro por franja. */
+        function renderRechazados() {
+            if (!ultimasStats) return;
+            const filtro = document.getElementById('filtroFranja').value;
+            let lista;
+            if (filtro === 'total') lista = ultimosRechazados;
+            else if (filtro === 'fuera') lista = ultimosRechazados.filter(r => r.franja === 0);
+            else lista = ultimosRechazados.filter(r => r.franja === Number(filtro));
+
+            actualizarResumenFiltro(filtro);
+
+            const tbody = document.getElementById('cuerpoTablaRechazados');
+            tbody.innerHTML = '';
+
+            if (lista.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="7" style="text-align:center; background:#d4edda; color:#155724; font-weight:bold;">✅ Sin descartes en esta selección.</td>`;
+                tbody.appendChild(tr);
+            } else {
+                lista.forEach((r, index) => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td style="text-align: center;"><strong>${index + 1}</strong></td>
@@ -684,12 +751,13 @@
                         <td style="text-align: center;">
                             <input type="checkbox" class="large-checkbox" title="Marcar como registrado">
                         </td>
-                        <td class="col-extra ${claseOculta}"><strong>${r.motivo}</strong></td>
-                        <td class="col-extra ${claseOculta}">${etiquetaRiesgo(r)}</td>
+                        <td class="col-extra"><strong>${r.motivo}</strong></td>
+                        <td class="col-extra">${etiquetaRiesgo(r)}</td>
                     `;
-                    tbodyRechazados.appendChild(tr);
+                    tbody.appendChild(tr);
                 });
             }
+            aplicarVisibilidadColumnas();
         }
 
         window.onload = function() {
