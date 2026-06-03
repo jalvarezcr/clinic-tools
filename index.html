@@ -175,18 +175,16 @@
 
             <label>Turno de operación:</label>
             <select id="selTurno" onchange="cambiarTurno()">
-                <option value="nocturno">Nocturno (umbral 65)</option>
-                <option value="matutino">Matutino (umbral 40)</option>
-                <option value="vespertino">Vespertino (umbral 35)</option>
+                <option value="nocturno">Nocturno (3 franjas)</option>
+                <option value="matutino">Matutino</option>
+                <option value="vespertino">Vespertino</option>
             </select>
-            <div class="help-text" style="margin-top:6px;">La restricción solo se activa para las solicitudes que <strong>exceden</strong> el umbral del turno.</div>
+            <div class="help-text" style="margin-top:6px;">El límite es <strong>por franja horaria</strong>; <strong>no hay tope por turno</strong>. Cada franja descarta únicamente lo que excede <strong>su propio límite</strong>.</div>
 
-            <label>Capacidad Total del Turno:</label>
-            <input type="number" id="capTotal" value="65" oninput="validarLimites()">
-
+            <label style="margin-top:14px;">Límite por franja (horario):</label>
             <div id="contenedorFranjas"></div>
 
-            <div id="alertaLimites" class="alert success" style="padding:10px; font-size:1em;"></div>
+            <div id="infoSuma" class="help-text" style="margin-top:10px; font-style:italic;"></div>
 
             <h2>Datos de Entrada</h2>
             <div class="help-text">Pegue su listado aquí abajo (acepta columnas de Excel o texto con espacios). Formato de área: código + cama (ej. <strong>CO5</strong>, <strong>GU12</strong>, <strong>UCIN3</strong>):</div>
@@ -414,28 +412,20 @@
 
         function renderFranjas() {
             const turno = TURNOS[turnoActual];
-            document.getElementById('capTotal').value = turno.total;
             const cont = document.getElementById('contenedorFranjas');
             cont.innerHTML = turno.franjas.map(f => `
                 <label>${f.etiqueta}:</label>
-                <input type="number" class="inpFranja" data-fid="${f.id}" value="${f.limite}" oninput="validarLimites()">
+                <input type="number" class="inpFranja" data-fid="${f.id}" value="${f.limite}" oninput="actualizarSumaFranjas()">
             `).join('');
-            validarLimites();
+            actualizarSumaFranjas();
         }
 
-        function validarLimites() {
-            const total = parseInt(document.getElementById('capTotal').value) || 0;
+        // Solo informativo: la suma NO es un tope; el límite se aplica franja por franja.
+        function actualizarSumaFranjas() {
             let suma = 0;
             document.querySelectorAll('.inpFranja').forEach(i => suma += (parseInt(i.value) || 0));
-            const alerta = document.getElementById('alertaLimites');
-
-            if (suma === total) {
-                alerta.className = 'alert success';
-                alerta.innerText = `CORRECTO: las franjas suman ${suma}, coincidiendo con el umbral del turno.`;
-            } else {
-                alerta.className = 'alert error';
-                alerta.innerText = `¡ALERTA! Las franjas suman ${suma}, pero la capacidad del turno es ${total}.`;
-            }
+            document.getElementById('infoSuma').innerText =
+                `Suma de límites por franja: ${suma} (solo informativo — el límite se aplica por franja, nunca por turno).`;
         }
 
         function abrirModal() {
@@ -674,7 +664,6 @@
             ultimosRechazados = resultadosRechazados;
             ultimasStats = {
                 turnoNombre: turno.nombre,
-                umbralTotal: parseInt(document.getElementById('capTotal').value) || turno.total,
                 porFranja,
                 fuera: rechazadosFueraFranja.length,
                 totalSolicitadas: totalSolicitudes,
@@ -700,7 +689,7 @@
            (+ Fuera de Horario si aplica). El valor por defecto es "total". */
         function poblarFiltroFranja(turno, hayFuera) {
             const sel = document.getElementById('filtroFranja');
-            let opts = `<option value="total">Umbral total — Turno ${turno.nombre} (todas las franjas)</option>`;
+            let opts = `<option value="total">Umbral total (todas las franjas)</option>`;
             turno.franjas.forEach(f => { opts += `<option value="${f.id}">${f.etiqueta}</option>`; });
             if (hayFuera) opts += `<option value="fuera">Fuera de Horario</option>`;
             sel.innerHTML = opts;
@@ -713,7 +702,7 @@
             const el = document.getElementById('resumenFiltro');
             if (!s) { el.innerHTML = ''; return; }
             if (filtro === 'total') {
-                el.innerHTML = `Turno ${s.turnoNombre} · Umbral ${s.umbralTotal} · Solicitadas ${s.totalSolicitadas} · A preparar ${s.totalPreparar} · <span style="color:var(--danger);">Descartar ${s.totalDescartar}</span>` + (s.fuera ? ` · Fuera de horario ${s.fuera}` : '');
+                el.innerHTML = `Umbral total · Turno ${s.turnoNombre} (todas las franjas, sin tope global) · Solicitadas ${s.totalSolicitadas} · A preparar ${s.totalPreparar} · <span style="color:var(--danger);">Descartar ${s.totalDescartar}</span>` + (s.fuera ? ` · Fuera de horario ${s.fuera}` : '');
             } else if (filtro === 'fuera') {
                 el.innerHTML = `Fuera de Horario · ${s.fuera} solicitud(es) sin franja válida`;
             } else {
